@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>محاسبه‌گر هوشمند ارز دیجیتال</title>
+    <title>محاسبه‌گر ارز دیجیتال (نوبیتکس)</title>
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
     <style>
         :root {
@@ -247,6 +247,7 @@
             text-align: center;
             font-size: 0.75rem;
             color: var(--text-secondary);
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -254,8 +255,8 @@
 
 <div class="app-container">
     <header>
-        <h1>محاسبه‌گر لحظه‌ای ارز دیجیتال</h1>
-        <button class="refresh-btn" onclick="fetchAllPrices()">
+        <h1>محاسبه‌گر ارز (نوبیتکس)</h1>
+        <button class="refresh-btn" onclick="fetchNobitex()">
             <span>🔄 بروزرسانی</span>
         </button>
     </header>
@@ -276,7 +277,7 @@
                 <span class="coin-badge badge-usdt">USDT</span>
             </div>
             <div class="price-main" id="usdt-toman-price">در حال دریافت...</div>
-            <div class="price-sub" id="source-label">در حال اتصال...</div>
+            <div class="price-sub" id="source-label">صرافی نوبیتکس</div>
         </div>
     </div>
 
@@ -313,403 +314,7 @@
         </div>
     </div>
 
-    <div class="status-text" id="status-msg">در حال اتصال به سرورهای قیمت...</div>
-</div>
-
-<script>
-    let btcPriceUsdt = Number(localStorage.getItem('saved_btc_usdt')) || 0;
-    let usdtPriceToman = Number(localStorage.getItem('saved_usdt_toman')) || 0;
-    let selectedCoin = 'BTC';
-
-    const quickOptions = {
-        BTC: [0.001, 0.01, 0.05, 0.1, 1],
-        USDT: [10, 50, 100, 500, 1000]
-    };
-
-    function formatNumber(num, decimals = 0) {
-        return Number(num).toLocaleString('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        });
-    }
-
-    function renderQuickButtons() {
-        const container = document.getElementById('quick-buttons');
-        container.innerHTML = '';
-        quickOptions[selectedCoin].forEach(val => {
-            const btn = document.createElement('button');
-            btn.className = 'quick-btn';
-            btn.textContent = `+ ${val}`;
-            btn.onclick = () => {
-                const input = document.getElementById('amount-input');
-                const current = parseFloat(input.value) || 0;
-                input.value = Number((current + val).toFixed(6));
-                calculate();
-            };
-            container.appendChild(btn);
-        });
-    }
-
-    function selectCoin(coin) {
-        selectedCoin = coin;
-        document.getElementById('tab-btc').classList.toggle('active', coin === 'BTC');
-        document.getElementById('tab-usdt').classList.toggle('active', coin === 'USDT');
-        document.getElementById('input-coin-label').textContent = 
-            coin === 'BTC' ? 'مقدار بیت‌کوین را وارد کنید:' : 'مقدار تتر را وارد کنید:';
-        renderQuickButtons();
-        calculate();
-    }
-
-    function clearInput() {
-        document.getElementById('amount-input').value = '';
-        calculate();
-    }
-
-    function updateManualUsdt() {
-        
-win/get?url=${encodeURIComponent(targetUrl)}`;
-        const proxyRes = await fetch(proxyUrl);
-        const proxyData = await proxyRes.json();
-        return JSON.parse(proxyData.contents);
-    }
-
-    async function fetchPrices() {
-        const statusEl = document.getElementById('status-msg');
-        statusEl.textContent = 'در حال دریافت نرخ‌های لحظه‌ای از تبدیل...';
-
-        try {
-            const data = await fetchWithCorsFallback('https://api.tabdeal.org/r/plots/currency_prices/');
-            
-            // پشتیبانی از آرایه یا آبجکت در پاسخ تبدیل
-            const list = Array.isArray(data) ? data : (data.results || Object.values(data));
-
-            const btcUsdtMarket = list.find(m => m && (m.symbol === 'BTC_USDT' || m.name_en === 'BTC_USDT'));
-            const usdtIrtMarket = list.find(m => m && (m.symbol === 'USDT_IRT' || m.name_en === 'USDT_IRT'));
-            const btcIrtMarket = list.find(m => m && (m.symbol === 'BTC_IRT' || m.name_en === 'BTC_IRT'));
-
-            if (btcUsdtMarket) btcPriceUsdt = parseFloat(btcUsdtMarket.price || btcUsdtMarket.last_trade_price);
-            if (usdtIrtMarket) usdtPriceToman = Math.round(parseFloat(usdtIrtMarket.price || usdtIrtMarket.last_trade_price));
-            if (btcIrtMarket) btcPriceTomanDirect = Math.round(parseFloat(btcIrtMarket.price || btcIrtMarket.last_trade_price));
-
-            if (!btcPriceUsdt || !usdtPriceToman) {
-                throw new Error('داده ناقص دریافت شد');
-            }
-
-            document.getElementById('manual-usdt').value = usdtPriceToman;
-            updateDisplayPrices();
-            calculate();
-
-            const now = new Date().toLocaleTimeString('fa-IR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
-            statusEl.textContent = `بروزرسانی زنده از تبدیل: ${now}`;
-        } catch (error) {
-            statusEl.textContent = 'خطا در دریافت خودکار؛ اتصال اینترنت را بررسی یا نرخ تتر را دستی وارد کنید.';
-            updateDisplayPrices();
-            calculate();
-        }
-    }
-
-    renderQuickButtons();
-    fetchPrices();
-</script>
-
-</body>
-</html>
-;
-            --bg-card: #1e293b;
-            --bg-input: #0b1120;
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-btc: #f59e0b;
-            --accent-usdt: #10b981;
-            --accent-blue: #3b82f6;
-            --border-color: #334155;
-        }
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Vazirmatn', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-        body {
-            background-color: var(--bg-main);
-            color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 16px;
-        }
-        .app-container {
-            width: 100%;
-            max-width: 440px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 4px;
-        }
-        header h1 {
-            font-size: 1.2rem;
-            font-weight: 700;
-            background: linear-gradient(90deg, #38bdf8, #818cf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .refresh-btn {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 8px 12px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-        .refresh-btn:active {
-            transform: scale(0.95);
-        }
-        .prices-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .price-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 18px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            position: relative;
-            overflow: hidden;
-        }
-        .price-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 4px;
-            height: 100%;
-        }
-        .card-btc::before { background: var(--accent-btc); }
-        .card-usdt::before { background: var(--accent-usdt); }
-        .coin-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .coin-title {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            font-weight: 600;
-        }
-        .coin-badge {
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 6px;
-            font-weight: bold;
-        }
-        .badge-btc { background: rgba(245, 158, 11, 0.15); color: var(--accent-btc); }
-        .badge-usdt { background: rgba(16, 185, 129, 0.15); color: var(--accent-usdt); }
-        .price-main {
-            font-size: 1.25rem;
-            font-weight: 800;
-            direction: ltr;
-            text-align: right;
-        }
-        .price-sub {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-        .calc-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 22px;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .selector-tabs {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            background: var(--bg-input);
-            padding: 4px;
-            border-radius: 14px;
-            border: 1px solid var(--border-color);
-        }
-        .tab-btn {
-            padding: 10px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.9rem;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .tab-btn.active {
-            background: var(--accent-blue);
-            color: #fff;
-        }
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .input-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        .amount-input {
-            width: 100%;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 14px 16px;
-            border-radius: 14px;
-            font-size: 1.3rem;
-            font-weight: 700;
-            direction: ltr;
-            text-align: left;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .amount-input:focus {
-            border-color: var(--accent-blue);
-        }
-        .quick-amounts {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .quick-btn {
-            background: rgba(59, 130, 246, 0.12);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            color: #60a5fa;
-            padding: 6px 12px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            cursor: pointer;
-        }
-        .result-box {
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-        .result-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .result-title {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        .result-val {
-            font-size: 1.15rem;
-            font-weight: 700;
-            direction: ltr;
-        }
-        .val-usdt { color: var(--accent-usdt); }
-        .val-toman { color: #38bdf8; }
-        .manual-usdt-box {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(255,255,255,0.03);
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-        .manual-usdt-input {
-            width: 110px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 4px 8px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-        }
-        .status-text {
-            text-align: center;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-    </style>
-</head>
-<body>
-
-<div class="app-container">
-    <header>
-        <h1>محاسبه‌گر لحظه‌ای (تبدیل)</h1>
-        <button class="refresh-btn" onclick="fetchPrices()">
-            <span>🔄 بروزرسانی</span>
-        </button>
-    </header>
-
-    <div class="prices-grid">
-        <div class="price-card card-btc">
-            <div class="coin-header">
-                <span class="coin-title">بیت‌کوین</span>
-                <span class="coin-badge badge-btc">BTC</span>
-            </div>
-            <div class="price-main" id="btc-usdt-price">در حال دریافت...</div>
-            <div class="price-sub" id="btc-toman-price">--- تومان</div>
-        </div>
-
-        <div class="price-card card-usdt">
-            <div class="coin-header">
-                <span class="coin-title">تتر</span>
-                <span class="coin-badge badge-usdt">USDT</span>
-            </div>
-            <div class="price-main" id="usdt-toman-price">در حال دریافت...</div>
-            <div class="price-sub">منبع: صرافی تبدیل</div>
-        </div>
-    </div>
-
-    <div class="calc-card">
-        <div class="selector-tabs">
-            <button class="tab-btn active" id="tab-btc" onclick="selectCoin('BTC')">محاسبه بیت‌کوین (BTC)</button>
-            <button class="tab-btn" id="tab-usdt" onclick="selectCoin('USDT')">محاسبه تتر (USDT)</button>
-        </div>
-
-        <div class="input-group">
-            <div class="input-label">
-                <span id="input-coin-label">مقدار بیت‌کوین را وارد کنید:</span>
-                <span style="color:#60a5fa; cursor:pointer;" onclick="clearInput()">پاک کردن</span>
-            </div>
-            <input type="number" id="amount-input" class="amount-input" placeholder="0.00" step="any" oninput="calculate()">
-            <div class="quick-amounts" id="quick-buttons"></div>
-        </div>
-
-        <div class="result-box">
-            <div class="result-row">
-                <span class="result-title">ارزش به تتر (
-<span>تنظیم دستی قیمت تتر (تومان):</span>
-            <input type="number" id="manual-usdt" class="manual-usdt-input" oninput="updateManualUsdt()">
-        </div>
-    </div>
-
-    <div class="status-text" id="status-msg">در حال اتصال به صرافی تبدیل...</div>
+    <div class="status-text" id="status-msg">در حال دریافت اطلاعات از نوبیتکس...</div>
 </div>
 
 <script>
@@ -767,16 +372,17 @@ win/get?url=${encodeURIComponent(targetUrl)}`;
         if (val > 0) {
             usdtPriceToman = val;
             btcPriceTomanDirect = btcPriceUsdt * usdtPriceToman;
+            document.getElementById('source-label').textContent = 'نرخ دستی';
             updateDisplayPrices();
             calculate();
         }
     }
 
     function updateDisplayPrices() {
-        document.getElementById('btc-usdt-price').textContent = `${formatNumber(btcPriceUsdt, 1)} $`;
-        document.getElementById('usdt-toman-price').textContent = `${formatNumber(usdtPriceToman)} ت`;
+        document.getElementById('btc-usdt-price').textContent = btcPriceUsdt > 0 ? `${formatNumber(btcPriceUsdt, 1)} $` : '---';
+        document.getElementById('usdt-toman-price').textContent = usdtPriceToman > 0 ? `${formatNumber(usdtPriceToman)} ت` : '---';
         const btcToman = btcPriceTomanDirect > 0 ? btcPriceTomanDirect : (btcPriceUsdt * usdtPriceToman);
-        document.getElementById('btc-toman-price').textContent = `${formatNumber(Math.round(btcToman))} تومان`;
+        document.getElementById('btc-toman-price').textContent = btcToman > 0 ? `${formatNumber(Math.round(btcToman))} تومان` : '--- تومان';
     }
 
     function calculate() {
@@ -796,173 +402,72 @@ win/get?url=${encodeURIComponent(targetUrl)}`;
         document.getElementById('res-toman').textContent = `${formatNumber(Math.round(totalToman))} تومان`;
     }
 
-    async function fetchPrices() {
+    async function fetchNobitex() {
         const statusEl = document.getElementById('status-msg');
-        statusEl.textContent = 'در حال دریافت نرخ‌ها از صرافی تبدیل...';
+        statusEl.textContent = 'در حال دریافت نرخ لحظه‌ای از نوبیتکس...';
 
         try {
-            // دریافت لیست بازارهای صرافی تبدیل
-            const res = await fetch('https://api.tabdeal.org/r/plots/currency_prices/');
-            const markets = await res.json();
+            // اندپوینت V3 نوبیتکس (دریافت یکجای تمام بازارها بدون محدودیت CORS)
+            const response = await fetch('https://apiv2.nobitex.ir/v3/orderbook/all');
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            
+            const data = await response.json();
 
-            const btcUsdtMarket = markets.find(m => m.symbol === 'BTC_USDT');
-            const usdtIrtMarket = markets.find(m => m.symbol === 'USDT_IRT');
-            const btcIrtMarket = markets.find(m => m.symbol === 'BTC_IRT');
+            // ۱. قیمت تتر به ریال -> تقسیم بر ۱۰ برای تبدیل به تومان
+            if (data.USDTIRT && data.USDTIRT.lastTradePrice) {
+                usdtPriceToman = Math.round(parseFloat(data.USDTIRT.lastTradePrice) / 10);
+            }
 
-            if (btcUsdtMarket) btcPriceUsdt = parseFloat(btcUsdtMarket.price);
-            if (usdtIrtMarket) usdtPriceToman = Math.round(parseFloat(usdtIrtMarket.price));
-            if (btcIrtMarket) btcPriceTomanDirect = Math.round(parseFloat(btcIrtMarket.price));
+            // ۲. قیمت بیت‌کوین به تتر
+            if (data.BTCUSDT && data.BTCUSDT.lastTradePrice) {
+                btcPriceUsdt = parseFloat(data.BTCUSDT.lastTradePrice);
+            }
+
+            // ۳. قیمت مستقیم بیت‌کوین به ریال -> تقسیم بر ۱۰ برای تبدیل به تومان
+            if (data.BTCIRT && data.BTCIRT.lastTradePrice) {
+                btcPriceTomanDirect = Math.round(parseFloat(data.BTCIRT.lastTradePrice) / 10);
+            }
+
+            if (!usdtPriceToman || !btcPriceUsdt) {
+                throw new Error('داده ناقص از سرور');
+            }
 
             document.getElementById('manual-usdt').value = usdtPriceToman;
+            document.getElementById('source-label').textContent = 'منبع: نوبیتکس';
             updateDisplayPrices();
             calculate();
 
             const now = new Date().toLocaleTimeString('fa-IR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
-            statusEl.textContent = `بروزرسانی از تبدیل: ${now}`;
-        } catch (error) {
-            statusEl.textContent = 'خطا در اتصال به تبدیل؛ می‌توانید قیمت تتر را دستی وارد کنید.';
-            if (btcPriceUsdt === 0) btcPriceUsdt = 90000;
-            if (usdtPriceToman === 0) {
-                usdtPriceToman = 70000;
+            statusEl.textContent = `بروزرسانی موفق از نوبیتکس: ${now}`;
+        } catch (err) {
+            // اگر فیلترشکن روشن باشد ممکن است نوبیتکس آی‌پی خارجی را محدود کند، استفاده از پراکسی پشتیبان
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://apiv2.nobitex.ir/v3/orderbook/all');
+                const res2 = await fetch(proxyUrl);
+                const data2 = await res2.json();
+
+                if (data2.USDTIRT && data2.USDTIRT.lastTradePrice) {
+                    usdtPriceToman = Math.round(parseFloat(data2.USDTIRT.lastTradePrice) / 10);
+                }
+                if (data2.BTCUSDT && data2.BTCUSDT.lastTradePrice) {
+                    btcPriceUsdt = parseFloat(data2.BTCUSDT.lastTradePrice);
+                }
+                if (data2.BTCIRT && data2.BTCIRT.lastTradePrice) {
+                    btcPriceTomanDirect = Math.round(parseFloat(data2.BTCIRT.lastTradePrice) / 10);
+                }
+
                 document.getElementById('manual-usdt').value = usdtPriceToman;
-            }
-            updateDisplayPrices();
-            calculate();
-        }
-    }
-
-    renderQuickButtons();
-    fetchPrices();
-</script>
-
-</body>
-</html>
-م دستی قیمت تتر (تومان):</span>
-            <input type="number" id="manual-usdt" class="manual-usdt-input" oninput="updateManualUsdt()">
-        </div>
-    </div>
-
-    <div class="status-text" id="status-msg">در حال اتصال به سرور قیمت...</div>
-</div>
-
-<script>
-    let btcPriceUsdt = 0;
-    let usdtPriceToman = 0;
-    let selectedCoin = 'BTC';
-
-    const quickOptions = {
-        BTC: [0.001, 0.01, 0.05, 0.1, 1],
-        USDT: [10, 50, 100, 500, 1000]
-    };
-
-    function formatNumber(num, decimals = 0) {
-        return Number(num).toLocaleString('en-US', {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals
-        });
-    }
-
-    function renderQuickButtons() {
-        const container = document.getElementById('quick-buttons');
-        container.innerHTML = '';
-        quickOptions[selectedCoin].forEach(val => {
-            const btn = document.createElement('button');
-            btn.className = 'quick-btn';
-            btn.textContent = `+ ${val}`;
-            btn.onclick = () => {
-                const input = document.getElementById('amount-input');
-                const current = parseFloat(input.value) || 0;
-                input.value = Number((current + val).toFixed(6));
+                updateDisplayPrices();
                 calculate();
-            };
-            container.appendChild(btn);
-        });
-    }
-
-    function selectCoin(coin) {
-        selectedCoin = coin;
-        document.getElementById('tab-btc').classList.toggle('active', coin === 'BTC');
-        document.getElementById('tab-usdt').classList.toggle('active', coin === 'USDT');
-        document.getElementById('input-coin-label').textContent = 
-            coin === 'BTC' ? 'مقدار بیت‌کوین را وارد کنید:' : 'مقدار تتر را وارد کنید:';
-        renderQuickButtons();
-        calculate();
-    }
-
-    function clearInput() {
-        document.getElementById('amount-input').value = '';
-        calculate();
-    }
-
-    function updateManualUsdt() {
-        const val = parseFloat(document.getElementById('manual-usdt').value);
-        if (val > 0) {
-            usdtPriceToman = val;
-            updateDisplayPrices();
-            calculate();
-        }
-    }
-
-    function updateDisplayPrices() {
-        document.getElementById('btc-usdt-price').textContent = `${formatNumber(btcPriceUsdt, 1)} $`;
-        document.getElementById('usdt-toman-price').textContent = `${formatNumber(usdtPriceToman)} ت`;
-        const btcToman = btcPriceUsdt * usdtPriceToman;
-        document.getElementById('btc-toman-price').textContent = `${formatNumber(btcToman)} تومان`;
-    }
-
-    function calculate() {
-        const amount = parseFloat(document.getElementById('amount-input').value) || 0;
-        let totalUsdt = 0;
-
-        if (selectedCoin === 'BTC') {
-            totalUsdt = amount * btcPriceUsdt;
-        } else {
-            totalUsdt = amount;
-        }
-
-        const totalToman = totalUsdt * usdtPriceToman;
-
-        document.getElementById('res-usdt').textContent = `${formatNumber(totalUsdt, 2)} USDT`;
-        document.getElementById('res-toman').textContent = `${formatNumber(Math.round(totalToman))} تومان`;
-    }
-
-    async function fetchPrices() {
-        const statusEl = document.getElementById('status-msg');
-        statusEl.textContent = 'در حال دریافت نرخ‌های لحظه‌ای...';
-
-        try {
-            // دریافت قیمت بیت‌کوین از بایننس
-            const btcRes = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-            const btcData = await btcRes.json();
-            btcPriceUsdt = parseFloat(btcData.price);
-
-            // دریافت قیمت تتر به تومان از نوبیتکس
-            const usdtRes = await fetch('https://api.nobitex.ir/v2/orderbook/USDTIRT');
-            const usdtData = await usdtRes.json();
-            if (usdtData && usdtData.lastTradePrice) {
-                usdtPriceToman = Math.round(parseFloat(usdtData.lastTradePrice) / 10);
+                statusEl.textContent = 'بروزرسانی موفق (حالت با فیلترشکن)';
+            } catch (err2) {
+                statusEl.textContent = 'خطا در اتصال به نوبیتکس (فیلترشکن را خاموش کنید و بروزرسانی را بزنید).';
             }
-
-            document.getElementById('manual-usdt').value = usdtPriceToman;
-            updateDisplayPrices();
-            calculate();
-
-            const now = new Date().toLocaleTimeString('fa-IR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
-            statusEl.textContent = `آخرین بروزرسانی موفق: ${now}`;
-        } catch (error) {
-            statusEl.textContent = 'خطا در دریافت خودکار؛ می‌توانید قیمت تتر را دستی وارد کنید.';
-            if (btcPriceUsdt === 0) btcPriceUsdt = 90000;
-            if (usdtPriceToman === 0) {
-                usdtPriceToman = 70000;
-                document.getElementById('manual-usdt').value = usdtPriceToman;
-            }
-            updateDisplayPrices();
-            calculate();
         }
     }
 
     renderQuickButtons();
-    fetchPrices();
+    fetchNobitex();
 </script>
 
 </body>
