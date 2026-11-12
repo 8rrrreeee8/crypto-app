@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>محاسبه‌گر هوشمند ارز دیجیتال</title>
+    <title>محاسبه‌گر ارز دیجیتال (صرافی تبدیل)</title>
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
     <style>
         :root {
@@ -47,7 +47,7 @@
             padding: 8px 4px;
         }
         header h1 {
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             font-weight: 700;
             background: linear-gradient(90deg, #38bdf8, #818cf8);
             -webkit-background-clip: text;
@@ -253,7 +253,7 @@
 
 <div class="app-container">
     <header>
-        <h1>محاسبه‌گر لحظه‌ای ارز</h1>
+        <h1>محاسبه‌گر لحظه‌ای (تبدیل)</h1>
         <button class="refresh-btn" onclick="fetchPrices()">
             <span>🔄 بروزرسانی</span>
         </button>
@@ -275,7 +275,7 @@
                 <span class="coin-badge badge-usdt">USDT</span>
             </div>
             <div class="price-main" id="usdt-toman-price">در حال دریافت...</div>
-            <div class="price-sub">نرخ لحظه‌ای بازار</div>
+            <div class="price-sub">منبع: صرافی تبدیل</div>
         </div>
     </div>
 
@@ -308,6 +308,139 @@
 
         <div class="manual-usdt-box">
             <span>تنظیم دستی قیمت تتر (تومان):</span>
+            <input type="number" id="manual-usdt" class="manual-usdt-input" oninput="updateManualUsdt()">
+        </div>
+    </div>
+
+    <div class="status-text" id="status-msg">در حال اتصال به صرافی تبدیل...</div>
+</div>
+
+<script>
+    let btcPriceUsdt = 0;
+    let usdtPriceToman = 0;
+    let btcPriceTomanDirect = 0;
+    let selectedCoin = 'BTC';
+
+    const quickOptions = {
+        BTC: [0.001, 0.01, 0.05, 0.1, 1],
+        USDT: [10, 50, 100, 500, 1000]
+    };
+
+    function formatNumber(num, decimals = 0) {
+        return Number(num).toLocaleString('en-US', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        });
+    }
+
+    function renderQuickButtons() {
+        const container = document.getElementById('quick-buttons');
+        container.innerHTML = '';
+        quickOptions[selectedCoin].forEach(val => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-btn';
+            btn.textContent = `+ ${val}`;
+            btn.onclick = () => {
+                const input = document.getElementById('amount-input');
+                const current = parseFloat(input.value) || 0;
+                input.value = Number((current + val).toFixed(6));
+                calculate();
+            };
+            container.appendChild(btn);
+        });
+    }
+
+    function selectCoin(coin) {
+        selectedCoin = coin;
+        document.getElementById('tab-btc').classList.toggle('active', coin === 'BTC');
+        document.getElementById('tab-usdt').classList.toggle('active', coin === 'USDT');
+        document.getElementById('input-coin-label').textContent = 
+            coin === 'BTC' ? 'مقدار بیت‌کوین را وارد کنید:' : 'مقدار تتر را وارد کنید:';
+        renderQuickButtons();
+        calculate();
+    }
+
+    function clearInput() {
+        document.getElementById('amount-input').value = '';
+        calculate();
+    }
+
+    function updateManualUsdt() {
+        const val = parseFloat(document.getElementById('manual-usdt').value);
+        if (val > 0) {
+            usdtPriceToman = val;
+            btcPriceTomanDirect = btcPriceUsdt * usdtPriceToman;
+            updateDisplayPrices();
+            calculate();
+        }
+    }
+
+    function updateDisplayPrices() {
+        document.getElementById('btc-usdt-price').textContent = `${formatNumber(btcPriceUsdt, 1)} $`;
+        document.getElementById('usdt-toman-price').textContent = `${formatNumber(usdtPriceToman)} ت`;
+        const btcToman = btcPriceTomanDirect > 0 ? btcPriceTomanDirect : (btcPriceUsdt * usdtPriceToman);
+        document.getElementById('btc-toman-price').textContent = `${formatNumber(Math.round(btcToman))} تومان`;
+    }
+
+    function calculate() {
+        const amount = parseFloat(document.getElementById('amount-input').value) || 0;
+        let totalUsdt = 0;
+        let totalToman = 0;
+
+        if (selectedCoin === 'BTC') {
+            totalUsdt = amount * btcPriceUsdt;
+            totalToman = btcPriceTomanDirect > 0 ? (amount * btcPriceTomanDirect) : (totalUsdt * usdtPriceToman);
+        } else {
+            totalUsdt = amount;
+            totalToman = totalUsdt * usdtPriceToman;
+        }
+
+        document.getElementById('res-usdt').textContent = `${formatNumber(totalUsdt, 2)} USDT`;
+        document.getElementById('res-toman').textContent = `${formatNumber(Math.round(totalToman))} تومان`;
+    }
+
+    async function fetchPrices() {
+        const statusEl = document.getElementById('status-msg');
+        statusEl.textContent = 'در حال دریافت نرخ‌ها از صرافی تبدیل...';
+
+        try {
+            // دریافت لیست بازارهای صرافی تبدیل
+            const res = await fetch('https://api.tabdeal.org/r/plots/currency_prices/');
+            const markets = await res.json();
+
+            const btcUsdtMarket = markets.find(m => m.symbol === 'BTC_USDT');
+            const usdtIrtMarket = markets.find(m => m.symbol === 'USDT_IRT');
+            const btcIrtMarket = markets.find(m => m.symbol === 'BTC_IRT');
+
+            if (btcUsdtMarket) btcPriceUsdt = parseFloat(btcUsdtMarket.price);
+            if (usdtIrtMarket) usdtPriceToman = Math.round(parseFloat(usdtIrtMarket.price));
+            if (btcIrtMarket) btcPriceTomanDirect = Math.round(parseFloat(btcIrtMarket.price));
+
+            document.getElementById('manual-usdt').value = usdtPriceToman;
+            updateDisplayPrices();
+            calculate();
+
+            const now = new Date().toLocaleTimeString('fa-IR', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+            statusEl.textContent = `بروزرسانی از تبدیل: ${now}`;
+        } catch (error) {
+            statusEl.textContent = 'خطا در اتصال به تبدیل؛ می‌توانید قیمت تتر را دستی وارد کنید.';
+            if (btcPriceUsdt === 0) btcPriceUsdt = 90000;
+            if (usdtPriceToman === 0) {
+                usdtPriceToman = 70000;
+                document.getElementById('manual-usdt').value = usdtPriceToman;
+            }
+            updateDisplayPrices();
+            calculate();
+        }
+    }
+
+    renderQuickButtons();
+    fetchPrices();
+</script>
+
+</body>
+</html>
+م دستی قیمت تتر (تومان):</span>
             <input type="number" id="manual-usdt" class="manual-usdt-input" oninput="updateManualUsdt()">
         </div>
     </div>
